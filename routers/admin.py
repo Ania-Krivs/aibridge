@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Header
-from data.handler import get_db, statistics_for_mounth, admin_authorization
+from data.handler import get_db, admin_authorization
 from sqlalchemy.orm import Session
 from data.models import User, Statistics
 import data.schemas as resp
@@ -27,13 +27,6 @@ async def create_key(
     sess.commit()
     sess.refresh(create)
     return create
-
-
-
-@router.get('/{user_token}/statistics')
-async def get_statistics(user_token: str) -> resp.Statistics:
-    return await statistics_for_mounth(user_token)
-
 
 
 @router.delete('/{user_token}/delete')

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Header
 from sqlalchemy.orm import Session
-from data.handler import user_authorisation, get_db, create_statistics, WebsocketsManager, admin_authorization
+from data.handler import user_authorisation, get_db, WebsocketsManager, admin_authorization
 from config import OPENAI_KEY
 from typing import Annotated, List, Optional
 
@@ -43,7 +43,7 @@ async def request_for_openai(user_token: str, model: str, prompt: str, sess: Ses
                 create = datetime.datetime.fromtimestamp(resp.created)
                 request_tokens = resp.usage.prompt_tokens
                 response_tokens = resp.usage.completion_tokens               
-                await create_statistics(user_token, create, request_tokens, response_tokens)
+                # await create_statistics(user_token, create, request_tokens, response_tokens)
 
                 #count used tokens 
                 find_key.tokens -= request_tokens
@@ -61,53 +61,6 @@ async def request_for_openai(user_token: str, model: str, prompt: str, sess: Ses
         
     else:
         return {"Error": "Authorization token invalid"}
-    
-
-@router.post("/moderation")
-async def moderation(admin_token: Annotated[str, Header()], texts: Optional[List[str]]= None, image_urls: Optional[List[str]] = None):
-    await admin_authorization(admin_token)
-    
-    data = []
-
-    if texts and not image_urls:
-        for text in texts:
-            if texts:
-                data.append({"type": "text", "text": text})
-
-    if image_urls and not texts:
-        for image_url in image_urls:
-            if image_url:
-                data.append({
-                    "type": "image_url",
-                    "image_url": {
-                        "url": image_url,
-                    }
-                })
-            
-    if image_urls and texts:
-        for image_url in image_urls:
-            data.append({
-                "type": "image_url",
-                "image_url": {
-                    "url": image_url,
-                }
-            })
-            
-        for text in texts:
-            data.append({"type": "text", "text": text})
-            
-    resp = openai.moderations.create(
-        model="omni-moderation-latest",
-        input=data,
-    )
-      
-    resp = [result.flagged for result in resp.results]  
-
-    if any(resp):
-        return "Unacceptable content"
-    
-    
-    return "OK"
     
 
 manager = WebsocketsManager()
@@ -148,7 +101,7 @@ async def request_for_openai(websocket: WebSocket, user_token: str, model: str, 
                     create = datetime.datetime.fromtimestamp(resp.created)
                     request_tokens = resp.usage.prompt_tokens
                     response_tokens = resp.usage.completion_tokens               
-                    await create_statistics(user_token, create, request_tokens, response_tokens)
+                    # await create_statistics(user_token, create, request_tokens, response_tokens)
 
                     #count used tokens 
                     find_key.tokens -= request_tokens
@@ -178,7 +131,7 @@ async def request_for_openai(websocket: WebSocket, user_token: str, model: str, 
                             
                             # create = datetime.datetime.fromtimestamp(resp.created)
                             create = datetime.datetime.now()
-                            await create_statistics(user_token, create, request_tokens, response_tokens)
+                            # await create_statistics(user_token, create, request_tokens, response_tokens)
                             
                             find_key.tokens -= request_tokens
                             sess.add(find_key)
