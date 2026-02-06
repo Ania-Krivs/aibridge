@@ -24,41 +24,20 @@ models = ["gpt-4o", "chatgpt-4o-latest", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"
 async def request_for_openai(user_token: str, model: str, prompt: str, sess: Session = Depends(get_db)):
 
     find_key = await user_authorisation(user_token, sess)
-    find_quantity_tokens = find_key.tokens
 
     if find_key is not None:
+        if model in models:
+            resp = openai.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": f"{prompt}"}],
+                max_tokens=2000,
+                temperature= 0.5
+            )
 
-        if find_quantity_tokens > 0:
-            
-            if model in models:
-
-                resp = openai.chat.completions.create(
-                    model=model,
-                    messages=[{"role": "user", "content": f"{prompt}"}],
-                    max_tokens=2000,
-                    temperature= 0.5
-                )
-
-                #consumption statistics
-                create = datetime.datetime.fromtimestamp(resp.created)
-                request_tokens = resp.usage.prompt_tokens
-                response_tokens = resp.usage.completion_tokens               
-                # await create_statistics(user_token, create, request_tokens, response_tokens)
-
-                #count used tokens 
-                find_key.tokens -= request_tokens
-                sess.add(find_key)
-                sess.commit()
-                sess.refresh(find_key)
-
-                return (resp.choices[0].message.content.strip())
-            
-            else:
-                return {"Error": "Model invalid"}
-
-        else:   
-            return {"Error": "Tokens over"}
+            return (resp.choices[0].message.content.strip())
         
+        else:
+            return {"Error": "Model invalid"}
     else:
         return {"Error": "Authorization token invalid"}
     
@@ -68,84 +47,47 @@ manager = WebsocketsManager()
 async def request_for_openai(websocket: WebSocket, user_token: str, model: str, prompt: str, stream: bool, sess):
 
     find_key = await user_authorisation(user_token, sess)
-    find_quantity_tokens = find_key.tokens
 
     if find_key is not None:
-
-        if find_quantity_tokens > 0:
-            
-            if model in models:
+        if model in models:
+            if stream is True:
+                resp = openai.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": f"{prompt}"}],
+                    max_tokens=2000,
+                    temperature= 0.5,
+                    stream=stream,
+                    stream_options={"include_usage": True}
+                )
                 
-                if stream is True:
-                    resp = openai.chat.completions.create(
-                        model=model,
-                        messages=[{"role": "user", "content": f"{prompt}"}],
-                        max_tokens=2000,
-                        temperature= 0.5,
-                        stream=stream,
-                        stream_options={"include_usage": True}
-                    )
-                    
-                else:
-                     resp = openai.chat.completions.create(
-                        model=model,
-                        messages=[{"role": "user", "content": f"{prompt}"}],
-                        max_tokens=2000,
-                        temperature= 0.5
-                    )
+            else:
+                 resp = openai.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": f"{prompt}"}],
+                    max_tokens=2000,
+                    temperature= 0.5
+                )
                      
                      
 
-                if stream == False:
-                    #consumption statistics
-                    create = datetime.datetime.fromtimestamp(resp.created)
-                    request_tokens = resp.usage.prompt_tokens
-                    response_tokens = resp.usage.completion_tokens               
-                    # await create_statistics(user_token, create, request_tokens, response_tokens)
-
-                    #count used tokens 
-                    find_key.tokens -= request_tokens
-                    sess.add(find_key)
-                    sess.commit()
-                    sess.refresh(find_key)
-
-                    return (resp.choices[0].message.content.strip())
-                
-                else:
-                    for r in resp:
-                        if r is not None:
-                            if len(r.choices) > 0:
-                                msg = r.choices[0].delta.content
-                                # print(msg)
-
-                            if msg is not None:
-                                await websocket.send_text(json.dumps(msg))
-
-                        # else:
-                        #     print(0)
-                        #     await websocket.send_text(json.dumps("Error"))
-                        #     return
-                        if r.usage is not None:
-                            request_tokens = r.usage.prompt_tokens
-                            response_tokens = r.usage.completion_tokens
-                            
-                            # create = datetime.datetime.fromtimestamp(resp.created)
-                            create = datetime.datetime.now()
-                            # await create_statistics(user_token, create, request_tokens, response_tokens)
-                            
-                            find_key.tokens -= request_tokens
-                            sess.add(find_key)
-                            sess.commit()
-                            sess.refresh(find_key)
-                            
-                    return
+            if stream == False:
+                return (resp.choices[0].message.content.strip())
             
             else:
-                return {"Error": "Model invalid"}
+                for r in resp:
+                    if r is not None:
+                        if len(r.choices) > 0:
+                            msg = r.choices[0].delta.content
+                            # print(msg)
 
-        else:   
-            return {"Error": "Tokens over"}
+                        if msg is not None:
+                            await websocket.send_text(json.dumps(msg))
+                        
+                return
         
+        else:
+            return {"Error": "Model invalid"}
+    
     else:
         return {"Error": "Authorization token invalid"}
 
@@ -171,8 +113,7 @@ async def websocket(websocket: WebSocket, user_token: str, sess: Session = Depen
                 if action == Action.info:
                     user = await get_user(user_token, sess)
                     resp = {
-                        "user_key": user.openai_key,
-                        "tokens": user.tokens
+                        "user_key": user.openai_key
                     }
                     
                 elif action == Action.request:

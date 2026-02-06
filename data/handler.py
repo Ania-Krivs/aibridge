@@ -1,6 +1,6 @@
 from fastapi import HTTPException, WebSocket
 from datetime import datetime
-from data.models import  Statistics, User
+from data.models import User
 from data.db import sessions
 from sqlalchemy import func
 from config import ADMIN_KEY

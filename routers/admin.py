@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Header
 from data.handler import get_db, admin_authorization
 from sqlalchemy.orm import Session
-from data.models import User, Statistics
+from data.models import User
 import data.schemas as resp
 from typing import Annotated
 
@@ -20,8 +20,7 @@ async def create_key(
     openai_key = secrets.token_hex(16)
     
     create = User(
-        openai_key=openai_key,
-        tokens=0
+        openai_key=openai_key
     )
     sess.add(create)
     sess.commit()
@@ -41,7 +40,7 @@ async def delete(
     if find_key is None:
         raise HTTPException(status_code=404, detail="Token is not found")
     
-    sess.query(Statistics).filter_by(openai_key=user_token).delete(synchronize_session=False)
+    # sess.query(Statistics).filter_by(openai_key=user_token).delete(synchronize_session=False)
     sess.delete(find_key)
     sess.commit()
     sess.close()
